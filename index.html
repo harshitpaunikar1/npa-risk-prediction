@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NPA Risk Prediction | Credit Scorecard Teardown</title>
+  <meta name="description" content="A black-and-white teardown of an NPA-oriented credit scorecard: default label, feature stack, model comparison, evaluation discipline, scoreband construction, and business actions.">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #111111;
+      --muted: #5e5e5e;
+      --soft: #f4f4f4;
+      --panel: #fafafa;
+      --line: #d2d2d2;
+      --line-strong: #8d8d8d;
+      --shade: #e8e8e8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+      text-decoration-color: var(--line-strong);
+      text-underline-offset: 0.18em;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    .masthead {
+      border-top: 3px solid var(--ink);
+      border-bottom: 1px solid var(--ink);
+      padding: 20px 0 24px;
+      margin-bottom: 28px;
+    }
+
+    .kicker {
+      margin: 0 0 12px;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 14ch;
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+    }
+
+    .deck {
+      margin: 18px 0 0;
+      max-width: 70ch;
+      font-size: 1.08rem;
+      color: var(--muted);
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .summary-strip article {
+      border: 1px solid var(--ink);
+      padding: 12px 14px;
+      background: var(--panel);
+    }
+
+    .summary-strip h2,
+    .summary-strip p {
+      margin: 0;
+    }
+
+    .summary-strip h2 {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.74rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .summary-strip p {
+      font-size: 0.95rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 250px;
+      gap: 28px;
+      align-items: start;
+    }
+
+    .article {
+      min-width: 0;
+    }
+
+    .rail {
+      position: sticky;
+      top: 18px;
+      border: 1px solid var(--ink);
+      padding: 16px;
+      background: var(--panel);
+    }
+
+    .rail h2 {
+      margin: 0 0 10px;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.76rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .rail p,
+    .rail li {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .rail ul {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .section {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 18px;
+      padding: 20px 0 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .margin-note {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .section-body h2 {
+      margin: 0 0 12px;
+      font-size: 1.36rem;
+      line-height: 1.15;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 8px;
+    }
+
+    .section-body p {
+      margin: 0 0 14px;
+      font-size: 1rem;
+    }
+
+    .section-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .fine-print {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .callout {
+      border-left: 3px solid var(--ink);
+      padding: 12px 14px;
+      background: var(--soft);
+      margin: 16px 0;
+    }
+
+    .callout p {
+      margin: 0;
+    }
+
+    .committee-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      table-layout: fixed;
+    }
+
+    .committee-table caption {
+      caption-side: bottom;
+      text-align: left;
+      font-size: 0.84rem;
+      color: var(--muted);
+      padding-top: 8px;
+    }
+
+    .committee-table th,
+    .committee-table td {
+      border: 1px solid var(--line);
+      padding: 10px 10px 9px;
+      vertical-align: top;
+      font-size: 0.93rem;
+    }
+
+    .committee-table th {
+      background: var(--soft);
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.74rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-align: left;
+    }
+
+    .committee-table td strong {
+      display: block;
+      margin-bottom: 4px;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .comparison-grid,
+    .policy-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .comparison-card,
+    .policy-card {
+      border: 1px solid var(--ink);
+      padding: 14px;
+      background: var(--panel);
+    }
+
+    .comparison-card h3,
+    .policy-card h3,
+    figure h3 {
+      margin: 0 0 8px;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .comparison-card p,
+    .policy-card p {
+      margin: 0 0 10px;
+      font-size: 0.94rem;
+    }
+
+    .comparison-card p:last-child,
+    .policy-card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .metric-list {
+      margin: 12px 0 0;
+      padding-left: 18px;
+    }
+
+    .metric-list li {
+      margin-bottom: 8px;
+    }
+
+    pre {
+      margin: 16px 0;
+      padding: 14px;
+      overflow: auto;
+      background: #f7f7f7;
+      border: 1px solid var(--line);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    code,
+    pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      color: var(--ink);
+    }
+
+    figure {
+      margin: 18px 0;
+      border: 1px solid var(--ink);
+      padding: 12px;
+      background: #fcfcfc;
+    }
+
+    figcaption {
+      margin-top: 10px;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .diagram-title {
+      margin: 0 0 10px;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .footer-note {
+      border-top: 1px solid var(--ink);
+      padding-top: 16px;
+      margin-top: 28px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 980px) {
+      .summary-strip,
+      .comparison-grid,
+      .policy-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .rail {
+        position: static;
+        order: -1;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .summary-strip,
+      .comparison-grid,
+      .policy-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .margin-note {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 8px;
+      }
+
+      .page {
+        width: min(100% - 20px, 1180px);
+      }
+
+      h1 {
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <p class="kicker">Credit Committee Memorandum · Retail Lending · Comparative Scorecard Review</p>
+      <h1>NPA pressure does not begin in collections. It begins in origination design.</h1>
+      <p class="deck">This teardown treats the project as a lender's scorecard file rather than a generic machine-learning showcase: define the default label precisely, decide which borrower facts can enter the model, compare a transparent baseline against stronger challengers, then translate predicted default probability into score ranges that support approval, limit, price, and review discipline without pretending the model is the policy.</p>
+      <div class="summary-strip" aria-label="Executive summary strip">
+        <article>
+          <h2>Default Lens</h2>
+          <p>Illustrative target aligned to the README context: 90+ DPD within 12 months of booking.</p>
+        </article>
+        <article>
+          <h2>Primary Inputs</h2>
+          <p>Unified bureau history, delinquencies, income and obligations, application attributes, and bank-statement features.</p>
+        </article>
+        <article>
+          <h2>Model Stack</h2>
+          <p>Benchmarked logistic regression against tree ensembles under stratified folds and cost-sensitive learning.</p>
+        </article>
+        <article>
+          <h2>Decision Use</h2>
+          <p>Probabilities converted into scorecard tiers with policy overlays for approval, decline, exposure, and pricing.</p>
+        </article>
+      </div>
+    </header>
+
+    <div class="layout">
+      <main class="article">
+        <section class="section" id="pressure">
+          <aside class="margin-note">
+            Section I<br>
+            Loss Formation
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section I · NPA pressure is a portfolio-shaping problem, not a late-stage reporting problem</h2>
+            <p>Non-performing assets are usually discussed after stress has already surfaced: rising bucket roll rates, a harder collections tone, more conservative provisioning, and pressure on growth teams to compensate for credit drag. That framing is incomplete. A retail portfolio starts to accumulate future NPA pressure at the moment the lender chooses which applicant traits matter, which performance horizon defines failure, which risk ordering is acceptable, and how much operational discretion remains above the model. The scorecard is not an ornament to that decision; it is the mechanism that turns diffuse borrower information into a consistent ordering of expected bad outcomes.</p>
+            <p>That is why a useful teardown begins with decision architecture rather than algorithms. Default is comparatively rare in a clean acquisition book, so class imbalance will distort sloppy validation. Borrower quality is multi-source, so bureau data alone rarely captures liquidity strain, while bank statements alone often miss long-run credit conduct. Policy needs stable bands more than elegant raw probabilities, because business heads act through cutoffs, overrides, and exposure caps.</p>
+            <p>The project context supplied in the README points toward exactly that operating problem. It references unified bureau history, delinquency records, applicant characteristics, obligations, and bank-statement features. It also points to a benchmark contest between logistic regression and tree ensembles. The comparative undercurrent matters: a scorecard for lending is rarely judged only on top-line discrimination. It is judged on whether better rank ordering survives vintage drift, whether variable behavior remains explainable, whether the tail can be acted on with confidence, and whether calibration is disciplined enough that pricing and line assignment do not become folklore.</p>
+            <div class="callout">
+              <p><strong>Committee note.</strong> This page does not claim repo evidence for final coefficients, production cutoffs, or realized portfolio lift. Where the README provides method but not approved thresholds, illustrations are framed as policy examples rather than reported outcomes.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="label">
+          <aside class="margin-note">
+            Section II<br>
+            Target Definition
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section II · Define the default label before you discuss features</h2>
+            <p>A scorecard is only as coherent as its target. In this project, the natural label from the README context is a borrower who reaches <code>90+ days past due within 12 months</code> of origination. That choice is not merely conventional; it aligns the model to a credit event serious enough to matter for NPA formation while still being early enough for origination decisions to remain relevant. A looser label, such as any 30+ DPD event, would usually inflate the bad count with transitory payment noise. A later label, such as charge-off alone, may be too sparse or too delayed for a first-line acquisition score.</p>
+            <p>Label design has three practical components. First, the observation window must start at a clean and common point, usually booking or first disbursal. Second, exclusions must be explicit: thin-file applicants with incomplete observation periods, restructures booked under different product logic, and accounts closed before sufficient performance may need separate treatment. Third, the lender must decide whether the model is predicting borrower failure, facility failure, or customer-level stress across multiple trades. Those choices materially alter the denominator and therefore the economics of every cutoff.</p>
+            <p>Once defined, the label determines what “good ordering” really means: future 90+ DPD accounts must consistently rank above stable payers. If the label is ambiguous, cutoff economics become ambiguous too.</p>
+            <table class="committee-table">
+              <caption>Illustrative label design choices derived from the README's stated risk horizon and feature sources.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Design Element</th>
+                  <th scope="col">Reason for Inclusion</th>
+                  <th scope="col">What Goes Wrong if It Is Loose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Bad Definition</strong>90+ DPD within 12 months</td>
+                  <td>Anchors the score to severe delinquency that is economically meaningful for NPA pressure.</td>
+                  <td>Minor arrears can pollute the target and reduce the clarity of policy cutoffs.</td>
+                </tr>
+                <tr>
+                  <td><strong>Observation Start</strong>Booking or disbursal date</td>
+                  <td>Keeps every account aligned to the same exposure age.</td>
+                  <td>Mixed start points distort performance timing and calibration.</td>
+                </tr>
+                <tr>
+                  <td><strong>Exclusion Logic</strong>Incomplete outcome windows and special programs</td>
+                  <td>Prevents partial histories from masquerading as clean accounts.</td>
+                  <td>Bad rates look better than they are and back-testing becomes unreliable.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" id="features">
+          <aside class="margin-note">
+            Section III<br>
+            Borrower Facts
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section III · Feature design is an exercise in economic evidence, not variable accumulation</h2>
+            <p>The README already identifies the feature families that belong in a disciplined retail scorecard: bureau history, delinquency signals, income and obligations, application attributes, and bank-statement behavior. That mix is sensible because each family captures a different mechanism of future stress. Bureau trades and utilization show how the borrower has behaved in formal credit systems. Enquiry velocity approximates current credit hunger. Declinings or irregularities in bank-statement cash flow can expose liquidity strain before it registers in bureau files. Application attributes, when clean and compliant, help place those signals in context.</p>
+            <p>What matters is not only whether these variables correlate with default, but whether they do so in a way that will travel across time. Debt-to-income ratio is valuable because it compresses repayment capacity into a stable burden measure. Utilization matters because heavily drawn revolving lines often signal reduced shock absorption. Enquiry velocity matters because a sudden borrowing search can indicate stress, opportunism, or both. Payment consistency matters because chronically uneven repayment patterns often precede harder delinquency. Vintage risk matters because a recent trade book can behave differently from long-seasoned exposure even when headline income looks similar.</p>
+            <p>A lender-literate scorecard also distinguishes between features that are intrinsically predictive and features that are only temporarily convenient. If a field cannot be sourced reliably at decision time, it is not a production feature. If a variable only reflects a transient campaign or processing quirk, it belongs in analysis, not policy. That is one reason the logistic baseline remains useful even when tree ensembles outperform it: it exposes which borrower facts carry durable signal before more flexible methods are allowed to discover interactions.</p>
+            <table class="committee-table">
+              <caption>Feature families and why they matter operationally.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Feature Family</th>
+                  <th scope="col">Examples</th>
+                  <th scope="col">Operational Signal</th>
+                  <th scope="col">Governance Caution</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Bureau History</strong>Vintage, trade mix, prior severity</td>
+                  <td>Length of experience with credit and evidence of seasoning.</td>
+                  <td>Separates thin but clean applicants from seasoned but stressed ones.</td>
+                  <td>Thin-file treatment must be explicit rather than hidden in averages.</td>
+                </tr>
+                <tr>
+                  <td><strong>Obligation Load</strong>DTI, installment burden, utilization</td>
+                  <td>Measures present repayment strain against stated capacity.</td>
+                  <td>Supports limit and line-assignment decisions, not just approval.</td>
+                  <td>Income quality and update timeliness need scrutiny.</td>
+                </tr>
+                <tr>
+                  <td><strong>Credit Seeking</strong>Enquiry velocity, recent applications</td>
+                  <td>Captures sudden demand for external liquidity.</td>
+                  <td>Useful for spotting deteriorating applicants before first missed payment.</td>
+                  <td>Channel-driven spikes can look like risk when they are marketing artifacts.</td>
+                </tr>
+                <tr>
+                  <td><strong>Behavioral Consistency</strong>Payment regularity, statement inflow stability</td>
+                  <td>Signals cash discipline and liquidity predictability.</td>
+                  <td>Often sharpens separation within apparently similar bureau segments.</td>
+                  <td>Bank-statement parsing must be stable and explainable.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" id="comparison">
+          <aside class="margin-note">
+            Section IV<br>
+            Challenger Set
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section IV · The benchmark contest is not logistic regression versus trees; it is clarity versus incremental lift</h2>
+            <p>The README states that logistic regression and tree-based ensembles were benchmarked. That is the right contest, but the wrong way to describe it is “old model versus modern model.” In retail credit, logistic regression remains the natural incumbent because it produces monotonic, interpretable relationships once variables are binned or transformed properly. It is easier to document, easier to reason about in cutoffs, and usually simpler to calibrate into a score. Tree ensembles, by contrast, earn their place when interactions and non-linearities matter enough to improve rank ordering materially, especially in messy mixed-source data.</p>
+            <div class="comparison-grid">
+              <article class="comparison-card">
+                <h3>Logistic Regression</h3>
+                <p>Best when the institution wants a stable ranking logic that can be translated into points or simple additive reason codes. It is especially useful for exposing whether the basic data stack is already strong enough to separate risk without algorithmic complexity.</p>
+                <p>Its weakness is that borrower behavior does not always move linearly. The model may understate risk spikes at the edges of utilization, enquiry bursts, or statement volatility unless variables are carefully engineered.</p>
+              </article>
+              <article class="comparison-card">
+                <h3>Tree Ensembles</h3>
+                <p>Best when the signal lives in combinations: a moderate DTI may be acceptable in one cash-flow pattern and dangerous in another; recent enquiries may matter more for young bureau files than for seasoned ones.</p>
+                <p>The tradeoff is governance cost. Stronger lift is not enough if the model becomes harder to monitor, harder to explain, or harder to convert into durable policy bands.</p>
+              </article>
+            </div>
+            <p>The practical question is therefore comparative and operational: how much additional bad capture does the ensemble deliver in the reject or review tail, and does that gain remain after calibration, back-testing, and vintage analysis? If the uplift is modest, many lenders stay with the clearer scorecard. If it is meaningful, they may still deploy the ensemble as a challenger or pricing overlay while retaining a scorecard-like front-end for policy communication. The mistake is to confuse raw predictive power with deployable value.</p>
+            <p>Class imbalance complicates this comparison. Because the bad rate is typically much lower than the good rate, naive folds can exaggerate performance or make cutoff analysis unstable. The README's use of stratified validation and cost-sensitive learning is therefore not a technical flourish. It is a recognition that missing a bad account and rejecting a good account have different economic costs, and the training process should reflect that asymmetry. In lender terms, the model is being trained to respect the portfolio loss function, not simply the arithmetic majority class.</p>
+            <pre><code>for train_idx, test_idx in StratifiedKFold(n_splits=5, shuffle=True):
+    x_train, y_train = X[train_idx], y[train_idx]
+    x_test, y_test = X[test_idx], y[test_idx]
+
+    model.fit(x_train, y_train, sample_weight=loss_cost[y_train])
+    pd_hat = model.predict_proba(x_test)[:, 1]
+    record_fold_metrics(y_test, pd_hat)</code></pre>
+            <p class="fine-print">The snippet shows the operating idea, not a claim that this exact implementation is checked into the repository.</p>
+          </div>
+        </section>
+
+        <section class="section" id="evaluation">
+          <aside class="margin-note">
+            Section V<br>
+            Evidence Standard
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section V · Evaluation only matters if it explains what the portfolio team can do next</h2>
+            <p>A credit scorecard does not pass review because it has a respectable AUC in isolation. It passes review when several checks line up. AUC shows whether the model broadly ranks future bads ahead of goods. KS shows where the separation between the cumulative good and bad distributions is strongest, which is often where cutoffs become most informative. Lift shows whether the tail that the model calls risky truly concentrates more bads than random selection. Vintage back-testing shows whether the ranking remains intact after economic conditions or booking mix change. Calibration shows whether the predicted bad rate matches observed experience closely enough to support pricing, provisioning assumptions, or line assignment.</p>
+            <p>The comparative analysis is essential here. A challenger model can post a better AUC but produce weaker operational lift in the exact range where the lender wants to approve, review, or reject. Another can show an impressive KS peak in a sparse part of the population, making it less useful for practical cutoff design. The right readout is not “which metric is highest,” but “which model preserves decision quality across the ranges where policy changes money, effort, and customer mix.”</p>
+            <figure aria-labelledby="metrics-caption">
+              <p class="diagram-title">Diagram A · Metrics Interpretation Card</p>
+              <svg viewBox="0 0 860 320" width="100%" role="img" aria-label="Card explaining AUC, KS, lift, and operational interpretation">
+                <rect x="0" y="0" width="860" height="320" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+                <rect x="20" y="20" width="190" height="110" fill="#f5f5f5" stroke="#111111"/>
+                <rect x="230" y="20" width="190" height="110" fill="#f5f5f5" stroke="#111111"/>
+                <rect x="440" y="20" width="190" height="110" fill="#f5f5f5" stroke="#111111"/>
+                <rect x="650" y="20" width="190" height="110" fill="#f5f5f5" stroke="#111111"/>
+                <text x="38" y="46" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">AUC</text>
+                <text x="38" y="72" font-family="Georgia, serif" font-size="16">Overall rank ordering</text>
+                <text x="38" y="96" font-family="Georgia, serif" font-size="13">How often a future bad scores</text>
+                <text x="38" y="114" font-family="Georgia, serif" font-size="13">riskier than a future good.</text>
+                <text x="248" y="46" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">KS</text>
+                <text x="248" y="72" font-family="Georgia, serif" font-size="16">Best separation point</text>
+                <text x="248" y="96" font-family="Georgia, serif" font-size="13">Where cumulative bad capture</text>
+                <text x="248" y="114" font-family="Georgia, serif" font-size="13">pulls furthest from goods.</text>
+                <text x="458" y="46" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">LIFT</text>
+                <text x="458" y="72" font-family="Georgia, serif" font-size="16">Tail concentration</text>
+                <text x="458" y="96" font-family="Georgia, serif" font-size="13">How much more bad rate sits</text>
+                <text x="458" y="114" font-family="Georgia, serif" font-size="13">in the risky deciles vs. random.</text>
+                <text x="668" y="46" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">CALIBRATION</text>
+                <text x="668" y="72" font-family="Georgia, serif" font-size="16">Probability discipline</text>
+                <text x="668" y="96" font-family="Georgia, serif" font-size="13">Whether predicted bad rates</text>
+                <text x="668" y="114" font-family="Georgia, serif" font-size="13">match observed outcomes.</text>
+                <line x1="20" y1="156" x2="840" y2="156" stroke="#8d8d8d" stroke-width="1"/>
+                <text x="38" y="182" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">OPERATIONAL READ</text>
+                <text x="38" y="208" font-family="Georgia, serif" font-size="14">AUC says whether the model deserves attention.</text>
+                <text x="38" y="228" font-family="Georgia, serif" font-size="14">KS says where committee cutoffs should be examined.</text>
+                <text x="38" y="248" font-family="Georgia, serif" font-size="14">Lift says whether the risky tail is rich enough to change approve, review, or decline rules.</text>
+                <text x="38" y="274" font-family="Georgia, serif" font-size="14">Calibration says whether the same score can support limit or price.</text>
+                <text x="38" y="296" font-family="Georgia, serif" font-size="14">None of the four replaces vintage back-testing or post-launch drift monitoring.</text>
+              </svg>
+              <figcaption id="metrics-caption">A compact scorecard for reading metrics as portfolio tools rather than abstract model statistics.</figcaption>
+            </figure>
+            <ul class="metric-list">
+              <li><strong>AUC</strong> is the broad ranking check. It is necessary but insufficient for credit policy.</li>
+              <li><strong>KS</strong> is useful for cutoff discovery because it shows where the model most sharply differentiates outcomes.</li>
+              <li><strong>Lift</strong> matters when the lender needs to know whether manual review or rejection effort is being concentrated efficiently.</li>
+              <li><strong>Back-testing and calibration</strong> determine whether a nice development curve survives contact with later vintages and actual pricing decisions.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section" id="scoreband">
+          <aside class="margin-note">
+            Section VI<br>
+            Score Construction
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section VI · Probabilities become useful only after they are converted into scorebands the business can own</h2>
+            <p>Underwriters rarely work directly from raw probability of default. Policy committees want discrete bands because each range can carry a stable action set, documented override rules, exposure limits, and monitoring thresholds. The conversion from PD to scoreband is therefore not cosmetic. It is the point where statistical discrimination becomes operating policy. If calibration is acceptable, low predicted PDs can populate straight-through approval bands, middle ranges can absorb pricing or limit overlays, and the upper ranges can route to manual review or decline according to the institution's appetite and product economics.</p>
+            <p>A comparative perspective remains necessary. The best model for scorebanding is not always the model with the best development AUC; it is the model whose sorted output yields clear and stable business segments. A lender would rather own five bands with distinct bad rates and predictable review volumes than a marginally better model whose middle ranges blur together.</p>
+            <pre><code>bands = [
+    (0.00, 0.03, "A1", "Approve", "standard limit"),
+    (0.03, 0.06, "B1", "Approve", "conservative limit"),
+    (0.06, 0.10, "C1", "Approve with overlay", "price for risk"),
+    (0.10, 0.18, "D1", "Manual review", "document exceptions"),
+    (0.18, 1.00, "E1", "Decline or alternate program", "no standard book")
+]
+
+def map_scoreband(pd):
+    for lo, hi, band, action, overlay in bands:
+        if lo <= pd &lt; hi:
+            return band, action, overlay</code></pre>
+            <p>The numbers above are illustrative, not asserted repo outputs. They simply show the translation logic: ordered PD ranges become named policy buckets. Once named, those buckets can be tracked for bad rate, approval rate, manual touch rate, and realized loss by vintage. That is where scorecards become durable. The committee is no longer debating a mysterious model score; it is debating the economics and control posture of Band C versus Band D.</p>
+            <figure aria-labelledby="escalator-caption">
+              <p class="diagram-title">Diagram B · Scoreband Escalator</p>
+              <svg viewBox="0 0 900 420" width="100%" role="img" aria-label="Monochrome escalator showing applicants entering at the base and moving through scorebands into different actions">
+                <rect x="0" y="0" width="900" height="420" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+                <text x="36" y="36" font-family="Arial, sans-serif" font-size="12" letter-spacing="2">REVIEW EFFORT</text>
+                <line x1="70" y1="360" x2="70" y2="70" stroke="#8d8d8d" stroke-width="2"/>
+                <polygon points="70,60 64,76 76,76" fill="#8d8d8d"/>
+                <text x="774" y="36" font-family="Arial, sans-serif" font-size="12" letter-spacing="2">EXPECTED LOSS</text>
+                <line x1="830" y1="360" x2="830" y2="70" stroke="#8d8d8d" stroke-width="2"/>
+                <polygon points="830,60 824,76 836,76" fill="#8d8d8d"/>
+
+                <rect x="150" y="320" width="120" height="40" fill="#ededed" stroke="#111111"/>
+                <rect x="270" y="280" width="120" height="80" fill="#e2e2e2" stroke="#111111"/>
+                <rect x="390" y="230" width="120" height="130" fill="#d7d7d7" stroke="#111111"/>
+                <rect x="510" y="165" width="120" height="195" fill="#cbcbcb" stroke="#111111"/>
+                <rect x="630" y="90" width="120" height="270" fill="#c1c1c1" stroke="#111111"/>
+
+                <text x="168" y="344" font-family="Arial, sans-serif" font-size="12" letter-spacing="1">A1</text>
+                <text x="197" y="344" font-family="Georgia, serif" font-size="14">Straight-through approve</text>
+                <text x="288" y="306" font-family="Arial, sans-serif" font-size="12" letter-spacing="1">B1</text>
+                <text x="302" y="328" font-family="Georgia, serif" font-size="14">Approve</text>
+                <text x="286" y="348" font-family="Georgia, serif" font-size="14">conservative limit</text>
+                <text x="408" y="256" font-family="Arial, sans-serif" font-size="12" letter-spacing="1">C1</text>
+                <text x="422" y="278" font-family="Georgia, serif" font-size="14">Approve</text>
+                <text x="404" y="298" font-family="Georgia, serif" font-size="14">price and terms overlay</text>
+                <text x="528" y="192" font-family="Arial, sans-serif" font-size="12" letter-spacing="1">D1</text>
+                <text x="542" y="214" font-family="Georgia, serif" font-size="14">Manual review</text>
+                <text x="528" y="234" font-family="Georgia, serif" font-size="14">exception discipline</text>
+                <text x="648" y="118" font-family="Arial, sans-serif" font-size="12" letter-spacing="1">E1</text>
+                <text x="664" y="140" font-family="Georgia, serif" font-size="14">Decline</text>
+                <text x="646" y="160" font-family="Georgia, serif" font-size="14">or alternate program</text>
+
+                <line x1="96" y1="338" x2="150" y2="338" stroke="#111111" stroke-width="2"/>
+                <polygon points="150,338 138,332 138,344" fill="#111111"/>
+
+                <circle cx="108" cy="324" r="9" fill="#111111"/>
+                <line x1="108" y1="333" x2="108" y2="350" stroke="#111111" stroke-width="2"/>
+                <line x1="108" y1="338" x2="97" y2="344" stroke="#111111" stroke-width="2"/>
+                <line x1="108" y1="338" x2="119" y2="344" stroke="#111111" stroke-width="2"/>
+                <line x1="108" y1="350" x2="100" y2="362" stroke="#111111" stroke-width="2"/>
+                <line x1="108" y1="350" x2="116" y2="362" stroke="#111111" stroke-width="2"/>
+
+                <circle cx="132" cy="330" r="9" fill="#666666"/>
+                <line x1="132" y1="339" x2="132" y2="356" stroke="#666666" stroke-width="2"/>
+                <line x1="132" y1="344" x2="121" y2="350" stroke="#666666" stroke-width="2"/>
+                <line x1="132" y1="344" x2="143" y2="350" stroke="#666666" stroke-width="2"/>
+                <line x1="132" y1="356" x2="124" y2="368" stroke="#666666" stroke-width="2"/>
+                <line x1="132" y1="356" x2="140" y2="368" stroke="#666666" stroke-width="2"/>
+
+                <text x="92" y="387" font-family="Georgia, serif" font-size="15">Applicants enter from a common funnel.</text>
+                <text x="486" y="378" font-family="Georgia, serif" font-size="14">Higher steps imply higher expected loss</text>
+                <text x="486" y="396" font-family="Georgia, serif" font-size="14">and more manual effort.</text>
+              </svg>
+              <figcaption id="escalator-caption">Applicants arrive through the same origination process, but differentiated score ranges push them into increasingly restrictive policy actions as expected loss and review effort rise.</figcaption>
+            </figure>
+            <table class="committee-table">
+              <caption>Illustrative scoreband map. Thresholds are shown as policy examples, not reported production cutoffs.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Scoreband</th>
+                  <th scope="col">PD Range</th>
+                  <th scope="col">Primary Action</th>
+                  <th scope="col">Overlay Logic</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>A1</strong>Lowest risk</td>
+                  <td>0.00 to 0.03</td>
+                  <td>Straight-through approval where policy checks pass.</td>
+                  <td>Standard pricing and normal line assignment.</td>
+                </tr>
+                <tr>
+                  <td><strong>B1</strong>Low to moderate risk</td>
+                  <td>0.03 to 0.06</td>
+                  <td>Approval remains likely.</td>
+                  <td>Conservative limit, tighter document checks, or product restriction.</td>
+                </tr>
+                <tr>
+                  <td><strong>C1</strong>Borderline but bankable</td>
+                  <td>0.06 to 0.10</td>
+                  <td>Approve only if economics still clear hurdle.</td>
+                  <td>Risk-based pricing and more selective tenor or amount.</td>
+                </tr>
+                <tr>
+                  <td><strong>D1</strong>High review burden</td>
+                  <td>0.10 to 0.18</td>
+                  <td>Manual review rather than automatic approval.</td>
+                  <td>Document exception rationale and escalation authority.</td>
+                </tr>
+                <tr>
+                  <td><strong>E1</strong>Outside standard appetite</td>
+                  <td>0.18 and above</td>
+                  <td>Decline or route to a separate constrained program.</td>
+                  <td>No standard-book exposure absent explicit exception policy.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" id="actions">
+          <aside class="margin-note">
+            Section VII<br>
+            Business Action
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section VII · Different score ranges should inform different actions, not just a binary approve or decline</h2>
+            <p>The final discipline in a sound teardown is to show what the institution actually does with each range. For the strongest bands, the benefit is speed and consistency: fewer unnecessary manual touches, cleaner customer experience, and lower acquisition cost per booked account. For intermediate bands, the value is selective structure: moderate limits, adjusted pricing, shorter tenor, or tighter documentation so the lender does not subsidize risk unknowingly. For the upper tail, the scorecard can prevent leakage into the standard portfolio or concentrate review resources where analyst judgment still adds value.</p>
+            <p>Crucially, the model should inform policy rather than replace it. Approval still depends on policy exclusions, documentation integrity, product rules, and occasionally senior underwriter judgment. Limit and price changes must reflect business strategy, not just statistical ranking. The README's reference to policy overlays is therefore one of the most important signals in the project: it implies the design understands that risk analytics must be translated into governance and customer treatment.</p>
+            <div class="policy-grid">
+              <article class="policy-card">
+                <h3>Lower Score Range Actions</h3>
+                <p>Use the cleaner end of the distribution to reduce friction. Straight-through approval is justified only after basic policy checks, fraud controls, and eligibility rules remain satisfied.</p>
+                <p>The commercial gain is not just higher approval. It is lower manual cost, better turnaround time, and more consistent pricing for borrowers whose risk is already well separated.</p>
+              </article>
+              <article class="policy-card">
+                <h3>Middle Score Range Actions</h3>
+                <p>Do not waste the middle bands with indecision. They are where conservative limits, adjusted tenor, risk-based pricing, or additional document checks can preserve profitable volume without pretending the account is clean.</p>
+                <p>This is also where committee discipline matters most: too much optimism turns a middle band into a disguised high-risk band.</p>
+              </article>
+              <article class="policy-card">
+                <h3>Upper Score Range Actions</h3>
+                <p>Reserve manual review for cases where incremental information can genuinely change the decision. If the expected loss remains outside appetite after review, the correct action is a controlled decline, not a hopeful exception.</p>
+                <p>That is how the scorecard protects collections teams from inheriting avoidable stress.</p>
+              </article>
+              <article class="policy-card">
+                <h3>Monitoring After Launch</h3>
+                <p>Once bands are live, monitor PSI, drift in key features, and calibration by vintage. A band that once represented controlled risk can quietly worsen if enquiry behavior, statement quality, or product mix changes.</p>
+                <p>Monitoring is therefore part of origination quality, not a separate compliance afterthought.</p>
+              </article>
+            </div>
+            <p>The close of the scorecard story is therefore straightforward. Different ranges imply different business rights and obligations. Low-risk ranges justify speed. Intermediate ranges justify structure. High-risk ranges justify scrutiny or refusal. The institution still owns the policy, but it now owns it with a more coherent ordering of risk than intuition or static rules can provide. That is the practical meaning of an NPA prediction scorecard: not a machine that decides credit by itself, but a disciplined map showing where growth is defensible, where caution is warranted, and where the portfolio should stop pretending that price or paperwork can rescue weak credit.</p>
+          </div>
+        </section>
+
+        <section class="section" id="close">
+          <aside class="margin-note">
+            Section VIII<br>
+            Close
+          </aside>
+          <div class="section-body">
+            <h2>Credit Committee Section VIII · A good scorecard narrows disagreement before it narrows the book</h2>
+            <p>The strongest aspect of the project brief is that it connects modeling choices to portfolio use: clear default definition, unified borrower evidence, benchmark comparison, cost-aware validation, scoreband conversion, and monitoring through PSI, drift, and calibration. That sequence is what makes a lender's scorecard credible. It asks the committee to adopt a better ordering of borrower risk, then act on that ordering with explicit policy tools.</p>
+            <p class="footer-note">Self-contained page check: no external stylesheets, no external scripts, no images, no color outside black, white, and greys, and all diagrams rendered inline.</p>
+          </div>
+        </section>
+      </main>
+
+      <aside class="rail" aria-label="Side memorandum">
+        <h2>Memorandum Notes</h2>
+        <ul>
+          <li>The page is written as a teardown, not as a claim of production evidence beyond the README context provided.</li>
+          <li>The comparative thread is deliberate: logistic clarity versus ensemble lift is the central governance tension.</li>
+          <li>Tables and diagrams are illustrative operating tools. They explain decision design without asserting exact repo thresholds.</li>
+          <li>Monitoring matters because score ranges degrade through portfolio mix change, not only through model decay.</li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>
