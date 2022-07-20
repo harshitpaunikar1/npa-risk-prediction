@@ -36,3 +36,7 @@
 
 - Task summary: Came back after lunch and realized added one more evaluation metric that felt missing from the earlier comparison.
 - Deliverable: Should've caught it earlier but better now than later.
+## 2022-07-20 - Day 7: HTML scaffold
+
+- Task summary: One more pass: there was a subtle off-by-one error in the index slicing that was silently skewing results. Caught it and fixed it.
+- Deliverable: Good enough to not be embarrassing.
