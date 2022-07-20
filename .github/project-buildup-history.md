@@ -32,3 +32,7 @@
 
 - Task summary: This was the middle stretch where the project started feeling real. I kept going and tried to build the base page structure or component skeleton, then cleaned up whatever looked confusing or weak from the earlier days. By now I had enough structure to keep going without staring at the screen too long, which honestly helped a lot. This kind of work is mostly small decisions stacked together, even if it does not look dramatic from outside.
 - Deliverable: Ended the day with initial UI structure in hand, plus a few side notes on what still needed fixing later. There were still a couple of loose parts, but nothing serious enough to block the next step.
+## 2022-07-20 - Day 7: HTML scaffold
+
+- Task summary: Came back after lunch and realized added one more evaluation metric that felt missing from the earlier comparison.
+- Deliverable: Should've caught it earlier but better now than later.
