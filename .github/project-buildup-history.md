@@ -52,3 +52,7 @@
 
 - Task summary: Weekend code review of my own work. Mostly reading, but ended up fixing three things that were bothering me.
 - Deliverable: One of those satisfying small wins.
+## 2022-07-25 - Day 10: Artifacts
+
+- Task summary: Closer to the end, I was mostly tightening things up instead of inventing new scope. The job for the day was to create or organize diagrams, screenshots, and supporting visuals so the final result looked a bit more complete. Toward the end I mostly kept trimming weird bits, fixing wording, and tying the loose parts together. This kind of work is mostly small decisions stacked together, even if it does not look dramatic from outside.
+- Deliverable: Ended the day with support visuals in hand, plus a few side notes on what still needed fixing later. There were still a couple of loose parts, but nothing serious enough to block the next step.
