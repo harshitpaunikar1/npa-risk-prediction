@@ -60,3 +60,7 @@
 
 - Task summary: Late-night fix: pushed a config tweak after noticing the wrong default param was being used.
 - Deliverable: Small fix, clean result.
+## 2022-07-26 - Day 11: README check
+
+- Task summary: Closer to the end, I was mostly tightening things up instead of inventing new scope. The job for the day was to write a README that explains the problem, solution, and how to review the project so the final result looked a bit more complete. I was not trying to add anything fancy here, just making sure the thing looked complete enough to show someone. I was also trying to keep the idea grounded so it did not drift into random features for no reason.
+- Deliverable: Ended the day with project README in hand, plus a few side notes on what still needed fixing later. It was not super polished, just stable enough that I felt okay moving forward.
