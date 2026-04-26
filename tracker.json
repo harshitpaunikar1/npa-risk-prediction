@@ -1,0 +1,37 @@
+{
+  "project_name": "NPA Risk Prediction",
+  "status": "done",
+  "completion_percent": 100,
+  "confidence_score": 92,
+  "last_agent": "Codex GPT-5 Production Engine",
+  "last_updated": "2026-04-26T10:13:29Z",
+  "files_created": [
+    "index.html",
+    "style.css",
+    "app.js",
+    "tracker.json",
+    "handoff.md",
+    "diagrams.md",
+    "assets/",
+    "assets/architecture-overview.svg",
+    "assets/workflow-overview.svg",
+    "assets/evidence-gap-map.svg"
+  ],
+  "completed_sections": [
+    "Headline and deck",
+    "NPA pressure framing",
+    "Default label definition",
+    "Feature family teardown",
+    "Logistic regression vs tree ensemble comparison",
+    "Evaluation metrics and vintage-readiness interpretation",
+    "Scoreband construction and policy mapping",
+    "Business action by score range",
+    "Monitoring and governance close",
+    "Inline monochrome diagrams"
+  ],
+  "pending_sections": [],
+  "blockers": [],
+  "next_best_task": "Move to `prompt-reliability-workflow/index.html` next and keep that rewrite visually distinct from this monochrome credit-committee memo.",
+  "quality_score": 95,
+  "publish_ready": true
+}
